@@ -1,0 +1,1 @@
+ALTER TABLE `activity_blocks` MODIFY COLUMN `date` varchar(10) NOT NULL;

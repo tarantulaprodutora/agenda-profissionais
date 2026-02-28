@@ -1,0 +1,13 @@
+{
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install",
+  "framework": "vite",
+  "outputDirectory": "dist",
+  "env": {
+    "NODE_ENV": "production",
+    "DATABASE_URL": "@database_url",
+    "COOKIE_SECRET": "@cookie_secret",
+    "APP_ID": "@app_id",
+    "OWNER_OPEN_ID": "@owner_open_id"
+  }
+}

@@ -1,0 +1,1 @@
+ALTER TABLE `professionals` ADD `group_label` varchar(64) DEFAULT 'principal';
