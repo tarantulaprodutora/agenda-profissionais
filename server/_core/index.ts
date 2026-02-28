@@ -39,10 +39,8 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Real auth routes with email/password
   registerAuthRoutes(app);
-  // Mock auth routes for development
-  if (process.env.NODE_ENV === "development") {
-    registerMockAuthRoutes(app);
-  }
+  // Mock auth routes for development and production
+  registerMockAuthRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",
