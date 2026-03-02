@@ -11,7 +11,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
-import { CalendarDays, Users, BarChart3, LogOut, Download, FileSpreadsheet, FileText, Filter } from "lucide-react";
+import { CalendarDays, Users, BarChart3, LogOut, Download, FileSpreadsheet, FileText, Filter, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 import { format, subDays } from "date-fns";
@@ -184,6 +184,9 @@ export default function ReportsPage() {
           <Link href="/agenda"><Button variant="ghost" size="sm"><CalendarDays className="w-4 h-4 mr-1.5" /> Agenda</Button></Link>
           <Link href="/professionals"><Button variant="ghost" size="sm"><Users className="w-4 h-4 mr-1.5" /> Profissionais</Button></Link>
           <Link href="/reports"><Button variant="ghost" size="sm" className="text-primary"><BarChart3 className="w-4 h-4 mr-1.5" /> Relatórios</Button></Link>
+          {isAdmin && (
+            <Link href="/admin"><Button variant="ghost" size="sm"><Settings className="w-4 h-4 mr-1.5" /> Administração</Button></Link>
+          )}
         </nav>
         <div className="flex items-center gap-2">
           {isAuthenticated ? (

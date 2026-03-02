@@ -103,8 +103,8 @@ export default function AgendaBlock({
   
   // Convert hex to rgba for background — more refined opacity
   // Aumentar opacidade APENAS no modo DARK para melhor legibilidade
-  const bgColor     = isDarkMode ? color + "D9" : color + "26"; // 85% no dark, 15% no light
-  const borderColor = isDarkMode ? color + "E6" : color + "88"; // 90% no dark, 53% no light
+  const bgColor     = isDarkMode ? color + "B3" : color + "26"; // 70% no dark, 15% no light
+  const borderColor = isDarkMode ? color + "CC" : color + "88"; // 80% no dark, 53% no light
 
   const showContent = height >= 28;
   const showFull    = height >= 52;
@@ -204,11 +204,11 @@ export default function AgendaBlock({
 
           {/* ── Block content ── */}
           {showContent && (
-            <div className="relative px-1.5 py-0.5 h-full flex flex-col justify-between overflow-hidden z-4">
+            <div className="relative px-1.5 py-0.5 h-full flex flex-col justify-between overflow-hidden z-4" style={{ textShadow: isDarkMode ? '0 1px 2px rgba(0,0,0,0.6)' : 'none' }}>
               <div className="flex items-start justify-between gap-1">
                 <div className="flex-1 min-w-0">
                   {block.jobNumber && (
-                    <div className="text-[9px] font-mono dark:text-foreground/50 dark:text-white text-white truncate leading-tight">
+                    <div className="text-[9px] font-mono truncate leading-tight" style={{ color: isDarkMode ? 'rgba(255,255,255,0.85)' : color }}>
                       {block.jobNumber}
                     </div>
                   )}
@@ -221,7 +221,7 @@ export default function AgendaBlock({
                     </div>
                   )}
                   {showFull && block.jobName && (
-                    <div className="text-[10px] dark:text-foreground/70 dark:text-white/90 text-white truncate leading-tight mt-0.5">
+                    <div className="text-[10px] truncate leading-tight mt-0.5" style={{ color: isDarkMode ? 'rgba(255,255,255,0.9)' : color + 'dd' }}>
                       {block.jobName}
                     </div>
                   )}
@@ -245,7 +245,7 @@ export default function AgendaBlock({
                 )}
               </div>
               {showFull && (
-                <div className="text-[10px] dark:text-foreground/50 dark:text-white/90 text-white font-mono">
+                <div className="text-[10px] font-mono" style={{ color: isDarkMode ? 'rgba(255,255,255,0.8)' : color + 'cc' }}>
                   {block.startTime}–{block.endTime}
                 </div>
               )}

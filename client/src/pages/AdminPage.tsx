@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Trash2, CheckCircle, XCircle, Pencil, Plus, UserPlus } from "lucide-react";
+import { Trash2, CheckCircle, XCircle, Pencil, Plus, UserPlus, Search } from "lucide-react";
 
 interface User {
   id: number;
@@ -55,6 +55,11 @@ export default function AdminPage() {
   const [newRequesterName, setNewRequesterName] = useState("");
   const [editingRequester, setEditingRequester] = useState<Requester | null>(null);
   const [editingProf, setEditingProf] = useState<Professional | null>(null);
+
+  // Search/filter states
+  const [searchUsers, setSearchUsers] = useState("");
+  const [searchRequesters, setSearchRequesters] = useState("");
+  const [searchProfessionals, setSearchProfessionals] = useState("");
 
   // New user form states
   const [showNewUserForm, setShowNewUserForm] = useState(false);
@@ -165,7 +170,9 @@ export default function AdminPage() {
       });
 
       if (!response.ok) {
-        toast.error("Erro ao deletar usuário");
+        const error = await response.json();
+        toast.error(error.message || "Erro ao deletar usuário");
+        setDeleteConfirm(null);
         return;
       }
 
@@ -186,7 +193,9 @@ export default function AdminPage() {
       });
 
       if (!response.ok) {
-        toast.error("Erro ao mudar role");
+        const error = await response.json();
+        toast.error(error.message || "Erro ao mudar role");
+        loadData(); // Reload to revert the UI
         return;
       }
 
@@ -422,12 +431,69 @@ export default function AdminPage() {
                 </div>
               )}
 
-              {/* Users List */}
+              {/* Search Users */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar usuários..."
+                  value={searchUsers}
+                  onChange={(e) => setSearchUsers(e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 pl-9"
+                />
+              </div>
+
+              {/* Pending Users Section */}
+              {(() => {
+                const pendingUsers = users.filter((u) => !u.approved && u.name.toLowerCase().includes(searchUsers.toLowerCase()));
+                if (pendingUsers.length === 0) return null;
+                return (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-medium text-yellow-400 mb-3 flex items-center gap-2">
+                      <XCircle className="w-5 h-5" />
+                      Aguardando Aprovação ({pendingUsers.length})
+                    </h3>
+                    <div className="space-y-2">
+                      {pendingUsers.map((user) => (
+                        <div
+                          key={user.id}
+                          className="flex items-center justify-between bg-yellow-900/20 border border-yellow-700/40 p-4 rounded-lg"
+                        >
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{user.name}</p>
+                            <p className="text-slate-400 text-sm">{user.email}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              onClick={() => handleApproveUser(user.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setDeleteConfirm({ type: "user", id: user.id })}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Rejeitar
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Approved Users List */}
+              <h3 className="text-lg font-medium text-white mb-3">Usuários Ativos</h3>
               <div className="space-y-2">
-                {users.length === 0 ? (
-                  <p className="text-slate-400">Nenhum usuário encontrado</p>
-                ) : (
-                  users.map((user) => (
+                {(() => {
+                  const approvedFiltered = users.filter((u) => u.approved && u.name.toLowerCase().includes(searchUsers.toLowerCase()));
+                  if (approvedFiltered.length === 0) return <p className="text-slate-400">Nenhum usuário encontrado</p>;
+                  return approvedFiltered.map((user) => (
                     <div
                       key={user.id}
                       className="flex items-center justify-between bg-slate-700 p-4 rounded-lg"
@@ -478,15 +544,9 @@ export default function AdminPage() {
                         </Button>
                       </div>
 
-                      {!user.approved && (
-                        <div className="ml-4 flex items-center gap-1 text-yellow-400">
-                          <XCircle className="w-4 h-4" />
-                          <span className="text-sm">Pendente</span>
-                        </div>
-                      )}
                     </div>
-                  ))
-                )}
+                  ));
+                })()}
               </div>
             </div>
           </TabsContent>
@@ -511,12 +571,24 @@ export default function AdminPage() {
                 </Button>
               </div>
 
-              <h2 className="text-xl font-semibold text-white mb-4">Solicitantes</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">Solicitantes</h2>
+                <span className="text-sm text-slate-400">{requesters.length} total</span>
+              </div>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar solicitantes..."
+                  value={searchRequesters}
+                  onChange={(e) => setSearchRequesters(e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 pl-9"
+                />
+              </div>
               <div className="space-y-2">
-                {requesters.length === 0 ? (
-                  <p className="text-slate-400">Nenhum solicitante encontrado</p>
-                ) : (
-                  requesters.map((requester) => (
+                {(() => {
+                  const filtered = requesters.filter((r) => r.name.toLowerCase().includes(searchRequesters.toLowerCase()));
+                  if (filtered.length === 0) return <p className="text-slate-400">Nenhum solicitante encontrado</p>;
+                  return filtered.map((requester) => (
                     <div
                       key={requester.id}
                       className="flex items-center justify-between bg-slate-700 p-4 rounded-lg"
@@ -580,21 +652,33 @@ export default function AdminPage() {
                         )}
                       </div>
                     </div>
-                  ))
-                )}
+                  ));
+                })()}
               </div>
             </div>
           </TabsContent>
 
-          {/* ═══════════════════ Professionals Tab ═══════════════════ */}
+          {/* ═══════════════════ Professionals Tab ═══════════════════ */
           <TabsContent value="professionals" className="space-y-4">
             <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
-              <h2 className="text-xl font-semibold text-white mb-4">Editar Profissionais</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">Editar Profissionais</h2>
+                <span className="text-sm text-slate-400">{professionals.length} total</span>
+              </div>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Input
+                  placeholder="Buscar profissionais..."
+                  value={searchProfessionals}
+                  onChange={(e) => setSearchProfessionals(e.target.value)}
+                  className="bg-slate-700 border-slate-600 text-white placeholder-slate-400 pl-9"
+                />
+              </div>
               <div className="space-y-2">
-                {professionals.length === 0 ? (
-                  <p className="text-slate-400">Nenhum profissional encontrado</p>
-                ) : (
-                  professionals.map((prof) => (
+                {(() => {
+                  const filtered = professionals.filter((p) => p.name.toLowerCase().includes(searchProfessionals.toLowerCase()));
+                  if (filtered.length === 0) return <p className="text-slate-400">Nenhum profissional encontrado</p>;
+                  return filtered.map((prof) => (
                     <div
                       key={prof.id}
                       className="flex items-center justify-between bg-slate-700 p-4 rounded-lg"
@@ -654,8 +738,8 @@ export default function AdminPage() {
                         )}
                       </div>
                     </div>
-                  ))
-                )}
+                  ));
+                })()}
               </div>
             </div>
           </TabsContent>

@@ -271,6 +271,15 @@ export function registerAuthRoutes(app: Express) {
         return res.status(404).json({ message: "Usuário não encontrado" });
       }
 
+      // Prevent deleting the last admin
+      const userToDelete = authUsers[index];
+      if (userToDelete.role === "admin") {
+        const adminCount = authUsers.filter((u) => u.role === "admin").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ message: "Não é possível deletar o último administrador do sistema" });
+        }
+      }
+
       authUsers.splice(index, 1);
       res.json({ success: true });
     } catch (error) {
@@ -295,6 +304,14 @@ export function registerAuthRoutes(app: Express) {
 
       if (role !== "admin" && role !== "visualizador") {
         return res.status(400).json({ message: "Role inválido" });
+      }
+
+      // Prevent removing the last admin
+      if (user.role === "admin" && role !== "admin") {
+        const adminCount = authUsers.filter((u) => u.role === "admin").length;
+        if (adminCount <= 1) {
+          return res.status(400).json({ message: "Não é possível remover o último administrador do sistema" });
+        }
       }
 
       user.role = role;

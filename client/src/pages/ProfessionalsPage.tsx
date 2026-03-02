@@ -16,7 +16,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useState } from "react";
 import { Link } from "wouter";
-import { CalendarDays, Users, BarChart3, LogOut, Plus, Pencil, Trash2, Layers2 } from "lucide-react";
+import { CalendarDays, Users, BarChart3, LogOut, Plus, Pencil, Trash2, Layers2, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
 
@@ -155,6 +155,13 @@ export default function ProfessionalsPage() {
               <BarChart3 className="w-3.5 h-3.5 mr-1.5" /> Relatórios
             </Button>
           </Link>
+          {isAdmin && (
+            <Link href="/admin">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-xs font-medium h-8 px-3 rounded-lg">
+                <Settings className="w-3.5 h-3.5 mr-1.5" /> Administração
+              </Button>
+            </Link>
+          )}
         </nav>
         <div className="flex items-center gap-2">
           {isAuthenticated ? (
