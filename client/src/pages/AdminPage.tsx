@@ -75,12 +75,12 @@ export default function AdminPage() {
 
       if (requestersRes.ok) {
         const data = await requestersRes.json();
-        setRequesters(data.result?.data || []);
+        setRequesters(data.result?.data?.json || data.result?.data || []);
       }
 
       if (professionalsRes.ok) {
         const data = await professionalsRes.json();
-        setProfessionals(data.result?.data || []);
+        setProfessionals(data.result?.data?.json || data.result?.data || []);
       }
     } catch (error) {
       console.error("Failed to load data:", error);
