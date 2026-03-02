@@ -65,17 +65,28 @@ export function registerAuthRoutes(app: Express) {
         return res.status(401).json({ message: "Email ou senha inválidos" });
       }
 
-      // Create session token
+      // Create session token - use dev- prefix format so verifySession recognizes it
+      const openId = user.role === "admin" ? `dev-admin-${Date.now()}` : `dev-user-${Date.now()}`;
       let sessionToken: string;
       try {
-        sessionToken = await sdk.createSessionToken(user.email, {
+        sessionToken = await sdk.createSessionToken(openId, {
           name: user.name,
           expiresInMs: ONE_YEAR_MS,
         });
       } catch (error) {
-        console.warn("[Auth] Failed to create JWT token, using simple token:", error);
-        sessionToken = `auth-${user.id}-${Date.now()}`;
+        console.warn("[Auth] Failed to create JWT token, using dev cookie:", error);
+        sessionToken = openId;
       }
+
+      // Also upsert user in the mock DB so auth.me can find them
+      await db.upsertUser({
+        openId,
+        name: user.name,
+        email: user.email,
+        loginMethod: "email",
+        role: user.role,
+        lastSignedIn: new Date(),
+      });
 
       // Set cookie
       const cookieOptions = getSessionCookieOptions(req);
