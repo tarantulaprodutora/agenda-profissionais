@@ -658,7 +658,7 @@ export default function AdminPage() {
             </div>
           </TabsContent>
 
-          {/* ═══════════════════ Professionals Tab ═══════════════════ */
+          {/* ═══════════════════ Professionals Tab ═══════════════════ */}
           <TabsContent value="professionals" className="space-y-4">
             <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
               <div className="flex items-center justify-between mb-4">
