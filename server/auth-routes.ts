@@ -79,12 +79,14 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Also upsert user in the mock DB so auth.me can find them
+      // Map 'visualizador' to 'user' for DB compatibility (schema only has 'user'|'admin')
+      const dbRole = user.role === "admin" ? "admin" : "user";
       await db.upsertUser({
         openId,
         name: user.name,
         email: user.email,
         loginMethod: "email",
-        role: user.role,
+        role: dbRole as any,
         lastSignedIn: new Date(),
       });
 
@@ -108,7 +110,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // Signup endpoint
+  // Signup endpoint (self-registration, needs admin approval)
   app.post("/api/auth/signup", async (req: Request, res: Response) => {
     try {
       const { email, password, name } = req.body;
@@ -149,6 +151,58 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
+  // Create user endpoint (admin creates user directly, pre-approved)
+  app.post("/api/auth/create-user", async (req: Request, res: Response) => {
+    try {
+      const { email, password, name, role } = req.body;
+
+      if (!email || !password || !name) {
+        return res.status(400).json({ message: "Email, senha e nome são obrigatórios" });
+      }
+
+      // Check if user already exists
+      const existingUser = authUsers.find((u) => u.email === email);
+      if (existingUser) {
+        return res.status(409).json({ message: "Este email já está registrado" });
+      }
+
+      // Validate role
+      const userRole = (role === "admin" || role === "visualizador") ? role : "visualizador";
+
+      // Hash password
+      const hashedPassword = bcrypt.hashSync(password, 10);
+
+      // Create new user (pre-approved since admin is creating it)
+      const newUser: AuthUser = {
+        id: nextUserId++,
+        email,
+        password: hashedPassword,
+        name,
+        role: userRole,
+        approved: true,
+        createdAt: new Date(),
+      };
+
+      authUsers.push(newUser);
+
+      console.log(`[Auth] Admin created user: ${email} with role ${userRole}`);
+
+      res.json({
+        success: true,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+          approved: newUser.approved,
+        },
+      });
+    } catch (error) {
+      console.error("[Auth] Create user failed", error);
+      res.status(500).json({ message: "Erro ao criar usuário" });
+    }
+  });
+
   // Logout endpoint
   app.post("/api/auth/logout", async (req: Request, res: Response) => {
     try {
@@ -164,7 +218,6 @@ export function registerAuthRoutes(app: Express) {
   // Get all users (admin only)
   app.get("/api/auth/users", async (req: Request, res: Response) => {
     try {
-      // TODO: Check if user is admin
       res.json({
         users: authUsers.map((u) => ({
           id: u.id,

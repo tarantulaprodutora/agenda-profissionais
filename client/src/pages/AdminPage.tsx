@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Trash2, CheckCircle, XCircle } from "lucide-react";
+import { Trash2, CheckCircle, XCircle, Pencil, Plus, UserPlus } from "lucide-react";
 
 interface User {
   id: number;
@@ -53,7 +53,15 @@ export default function AdminPage() {
 
   // Form states
   const [newRequesterName, setNewRequesterName] = useState("");
+  const [editingRequester, setEditingRequester] = useState<Requester | null>(null);
   const [editingProf, setEditingProf] = useState<Professional | null>(null);
+
+  // New user form states
+  const [showNewUserForm, setShowNewUserForm] = useState(false);
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState<"admin" | "visualizador">("visualizador");
 
   useEffect(() => {
     loadData();
@@ -70,23 +78,63 @@ export default function AdminPage() {
 
       if (usersRes.ok) {
         const data = await usersRes.json();
-        setUsers(data.users);
+        setUsers(data.users || []);
       }
 
       if (requestersRes.ok) {
         const data = await requestersRes.json();
-        setRequesters(data.result?.data?.json || data.result?.data || []);
+        const list = data.result?.data?.json || data.result?.data || [];
+        setRequesters(Array.isArray(list) ? list : []);
       }
 
       if (professionalsRes.ok) {
         const data = await professionalsRes.json();
-        setProfessionals(data.result?.data?.json || data.result?.data || []);
+        const list = data.result?.data?.json || data.result?.data || [];
+        setProfessionals(Array.isArray(list) ? list : []);
       }
     } catch (error) {
       console.error("Failed to load data:", error);
       toast.error("Erro ao carregar dados");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ─── User Management ─────────────────────────────────────────────────────────
+
+  const handleCreateUser = async () => {
+    if (!newUserName.trim() || !newUserEmail.trim() || !newUserPassword.trim()) {
+      toast.error("Preencha todos os campos");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/auth/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newUserName,
+          email: newUserEmail,
+          password: newUserPassword,
+          role: newUserRole,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast.error(error.message || "Erro ao criar usuário");
+        return;
+      }
+
+      toast.success("Usuário criado com sucesso!");
+      setNewUserName("");
+      setNewUserEmail("");
+      setNewUserPassword("");
+      setNewUserRole("visualizador");
+      setShowNewUserForm(false);
+      loadData();
+    } catch (error) {
+      toast.error("Erro ao criar usuário");
     }
   };
 
@@ -149,6 +197,8 @@ export default function AdminPage() {
     }
   };
 
+  // ─── Requester Management ────────────────────────────────────────────────────
+
   const handleAddRequester = async () => {
     if (!newRequesterName.trim()) {
       toast.error("Nome do solicitante é obrigatório");
@@ -159,11 +209,12 @@ export default function AdminPage() {
       const response = await fetch("/api/trpc/requesters.create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newRequesterName }),
+        body: JSON.stringify({ json: { name: newRequesterName } }),
       });
 
       if (!response.ok) {
-        toast.error("Erro ao adicionar solicitante");
+        const error = await response.json();
+        toast.error(error?.error?.json?.message || "Erro ao adicionar solicitante");
         return;
       }
 
@@ -175,16 +226,44 @@ export default function AdminPage() {
     }
   };
 
+  const handleUpdateRequester = async () => {
+    if (!editingRequester || !editingRequester.name.trim()) {
+      toast.error("Nome do solicitante é obrigatório");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/trpc/requesters.update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ json: { id: editingRequester.id, name: editingRequester.name } }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast.error(error?.error?.json?.message || "Erro ao atualizar solicitante");
+        return;
+      }
+
+      toast.success("Solicitante atualizado!");
+      setEditingRequester(null);
+      loadData();
+    } catch (error) {
+      toast.error("Erro ao atualizar solicitante");
+    }
+  };
+
   const handleDeleteRequester = async (requesterId: number) => {
     try {
       const response = await fetch("/api/trpc/requesters.delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: requesterId }),
+        body: JSON.stringify({ json: { id: requesterId } }),
       });
 
       if (!response.ok) {
-        toast.error("Erro ao deletar solicitante");
+        const error = await response.json();
+        toast.error(error?.error?.json?.message || "Erro ao deletar solicitante");
         return;
       }
 
@@ -196,6 +275,8 @@ export default function AdminPage() {
     }
   };
 
+  // ─── Professional Management ─────────────────────────────────────────────────
+
   const handleUpdateProfessional = async () => {
     if (!editingProf) return;
 
@@ -204,13 +285,16 @@ export default function AdminPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: editingProf.id,
-          name: editingProf.name,
+          json: {
+            id: editingProf.id,
+            name: editingProf.name,
+          },
         }),
       });
 
       if (!response.ok) {
-        toast.error("Erro ao atualizar profissional");
+        const error = await response.json();
+        toast.error(error?.error?.json?.message || "Erro ao atualizar profissional");
         return;
       }
 
@@ -233,9 +317,18 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-slate-900 p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Administração</h1>
-          <p className="text-slate-400">Gerencie usuários, solicitantes e profissionais</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-white mb-2">Administração</h1>
+            <p className="text-slate-400">Gerencie usuários, solicitantes e profissionais</p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => setLocation("/")}
+            className="text-slate-300 border-slate-600 hover:bg-slate-700"
+          >
+            Voltar à Agenda
+          </Button>
         </div>
 
         <Tabs defaultValue="users" className="w-full">
@@ -251,10 +344,85 @@ export default function AdminPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Users Tab */}
+          {/* ═══════════════════ Users Tab ═══════════════════ */}
           <TabsContent value="users" className="space-y-4">
             <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
-              <h2 className="text-xl font-semibold text-white mb-4">Gerenciamento de Usuários</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-semibold text-white">Gerenciamento de Usuários</h2>
+                <Button
+                  onClick={() => setShowNewUserForm(!showNewUserForm)}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Novo Usuário
+                </Button>
+              </div>
+
+              {/* New User Form */}
+              {showNewUserForm && (
+                <div className="bg-slate-700 rounded-lg p-4 mb-4 border border-slate-600">
+                  <h3 className="text-lg font-medium text-white mb-3">Criar Novo Usuário</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <Input
+                      placeholder="Nome completo"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      className="bg-slate-600 border-slate-500 text-white placeholder-slate-400"
+                    />
+                    <Input
+                      placeholder="Email"
+                      type="email"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className="bg-slate-600 border-slate-500 text-white placeholder-slate-400"
+                    />
+                    <Input
+                      placeholder="Senha"
+                      type="password"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className="bg-slate-600 border-slate-500 text-white placeholder-slate-400"
+                    />
+                    <Select
+                      value={newUserRole}
+                      onValueChange={(value) => setNewUserRole(value as "admin" | "visualizador")}
+                    >
+                      <SelectTrigger className="bg-slate-600 border-slate-500 text-white">
+                        <SelectValue placeholder="Selecione o papel" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-700 border-slate-600">
+                        <SelectItem value="visualizador" className="text-white">
+                          Visualizador (somente leitura)
+                        </SelectItem>
+                        <SelectItem value="admin" className="text-white">
+                          Admin (acesso total)
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleCreateUser} className="bg-green-600 hover:bg-green-700">
+                      <Plus className="w-4 h-4 mr-1" />
+                      Criar Usuário
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowNewUserForm(false);
+                        setNewUserName("");
+                        setNewUserEmail("");
+                        setNewUserPassword("");
+                        setNewUserRole("visualizador");
+                      }}
+                      className="text-slate-300 border-slate-500"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Users List */}
               <div className="space-y-2">
                 {users.length === 0 ? (
                   <p className="text-slate-400">Nenhum usuário encontrado</p>
@@ -288,7 +456,7 @@ export default function AdminPage() {
                             handleChangeRole(user.id, value as "admin" | "visualizador")
                           }
                         >
-                          <SelectTrigger className="w-32 bg-slate-600 border-slate-500 text-white">
+                          <SelectTrigger className="w-36 bg-slate-600 border-slate-500 text-white">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-slate-700 border-slate-600">
@@ -323,7 +491,7 @@ export default function AdminPage() {
             </div>
           </TabsContent>
 
-          {/* Requesters Tab */}
+          {/* ═══════════════════ Requesters Tab ═══════════════════ */}
           <TabsContent value="requesters" className="space-y-4">
             <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
               <h2 className="text-xl font-semibold text-white mb-4">Adicionar Solicitante</h2>
@@ -333,11 +501,12 @@ export default function AdminPage() {
                   value={newRequesterName}
                   onChange={(e) => setNewRequesterName(e.target.value)}
                   className="bg-slate-700 border-slate-600 text-white placeholder-slate-400"
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") handleAddRequester();
                   }}
                 />
                 <Button onClick={handleAddRequester} className="bg-blue-600 hover:bg-blue-700">
+                  <Plus className="w-4 h-4 mr-1" />
                   Adicionar
                 </Button>
               </div>
@@ -352,14 +521,64 @@ export default function AdminPage() {
                       key={requester.id}
                       className="flex items-center justify-between bg-slate-700 p-4 rounded-lg"
                     >
-                      <p className="text-white font-medium">{requester.name}</p>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => setDeleteConfirm({ type: "requester", id: requester.id })}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex-1">
+                        {editingRequester?.id === requester.id ? (
+                          <Input
+                            value={editingRequester.name}
+                            onChange={(e) =>
+                              setEditingRequester({ ...editingRequester, name: e.target.value })
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleUpdateRequester();
+                              if (e.key === "Escape") setEditingRequester(null);
+                            }}
+                            className="bg-slate-600 border-slate-500 text-white"
+                            autoFocus
+                          />
+                        ) : (
+                          <p className="text-white font-medium">{requester.name}</p>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 ml-4">
+                        {editingRequester?.id === requester.id ? (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={handleUpdateRequester}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              Salvar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingRequester(null)}
+                              className="text-slate-300 border-slate-500"
+                            >
+                              Cancelar
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingRequester(requester)}
+                              className="text-blue-400 border-blue-400 hover:bg-blue-400/10"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setDeleteConfirm({ type: "requester", id: requester.id })}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))
                 )}
@@ -367,7 +586,7 @@ export default function AdminPage() {
             </div>
           </TabsContent>
 
-          {/* Professionals Tab */}
+          {/* ═══════════════════ Professionals Tab ═══════════════════ */}
           <TabsContent value="professionals" className="space-y-4">
             <div className="bg-slate-800 rounded-lg p-6 border border-slate-700">
               <h2 className="text-xl font-semibold text-white mb-4">Editar Profissionais</h2>
@@ -391,7 +610,12 @@ export default function AdminPage() {
                             onChange={(e) =>
                               setEditingProf({ ...editingProf, name: e.target.value })
                             }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") handleUpdateProfessional();
+                              if (e.key === "Escape") setEditingProf(null);
+                            }}
                             className="bg-slate-600 border-slate-500 text-white"
+                            autoFocus
                           />
                         ) : (
                           <p className="text-white font-medium">{prof.name}</p>
@@ -412,6 +636,7 @@ export default function AdminPage() {
                               size="sm"
                               variant="outline"
                               onClick={() => setEditingProf(null)}
+                              className="text-slate-300 border-slate-500"
                             >
                               Cancelar
                             </Button>
@@ -421,7 +646,9 @@ export default function AdminPage() {
                             size="sm"
                             variant="outline"
                             onClick={() => setEditingProf(prof)}
+                            className="text-blue-400 border-blue-400 hover:bg-blue-400/10"
                           >
+                            <Pencil className="w-4 h-4 mr-1" />
                             Editar
                           </Button>
                         )}

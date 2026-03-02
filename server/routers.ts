@@ -14,6 +14,7 @@ import {
   seedActivityTypes,
   getAllRequesters,
   createRequester,
+  updateRequester,
   deleteRequester,
   seedRequesters,
   getBlocksByDate,
@@ -106,6 +107,13 @@ export const appRouter = router({
       .input(z.object({ name: z.string().min(1).max(128) }))
       .mutation(async ({ input }) => {
         await createRequester(input.name);
+        return { success: true };
+      }),
+
+    update: adminProcedure
+      .input(z.object({ id: z.number().int(), name: z.string().min(1).max(128) }))
+      .mutation(async ({ input }) => {
+        await updateRequester(input.id, input.name);
         return { success: true };
       }),
 

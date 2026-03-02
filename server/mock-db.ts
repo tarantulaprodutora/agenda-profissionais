@@ -131,6 +131,14 @@ export function addRequester(data: InsertRequester) {
   return requester;
 }
 
+export function updateRequester(id: number, data: Partial<InsertRequester>) {
+  const requester = mockDb.requesters.find(r => r.id === id);
+  if (requester) {
+    Object.assign(requester, data);
+  }
+  return requester;
+}
+
 export function deleteRequester(id: number) {
   const requester = mockDb.requesters.find(r => r.id === id);
   if (requester) {

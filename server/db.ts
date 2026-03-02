@@ -44,13 +44,42 @@ function isUsingMockDb() {
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
+// In-memory user store for mock DB mode
+const mockUserStore = new Map<string, {
+  id: number;
+  openId: string;
+  name: string;
+  email: string;
+  loginMethod: string;
+  role: string;
+  lastSignedIn: Date;
+}>();
+
 export async function upsertUser(user: InsertUser): Promise<void> {
   if (!user.openId) throw new Error("User openId is required for upsert");
   
-  // For mock database, just store in memory
+  // For mock database, store in memory map
   if (isUsingMockDb()) {
-    // Mock implementation - just log it
-    console.log("[Mock DB] Upserting user:", user.openId, user.name);
+    const existing = mockUserStore.get(user.openId);
+    if (existing) {
+      // Update existing fields
+      if (user.name !== undefined) existing.name = user.name ?? "Dev User";
+      if (user.email !== undefined) existing.email = user.email ?? "dev@example.com";
+      if (user.role !== undefined) existing.role = user.role;
+      if (user.loginMethod !== undefined) existing.loginMethod = user.loginMethod ?? "mock";
+      if (user.lastSignedIn !== undefined) existing.lastSignedIn = user.lastSignedIn;
+    } else {
+      mockUserStore.set(user.openId, {
+        id: mockUserStore.size + 1,
+        openId: user.openId,
+        name: user.name ?? "Dev User",
+        email: user.email ?? "dev@example.com",
+        loginMethod: user.loginMethod ?? "mock",
+        role: user.role ?? (user.openId.includes("admin") ? "admin" : "user"),
+        lastSignedIn: user.lastSignedIn ?? new Date(),
+      });
+    }
+    console.log("[Mock DB] Upserted user:", user.openId, user.name, user.role);
     return;
   }
   
@@ -89,7 +118,12 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 
 export async function getUserByOpenId(openId: string) {
   if (isUsingMockDb()) {
-    // Mock implementation - return a mock user
+    // Check stored users first
+    const stored = mockUserStore.get(openId);
+    if (stored) {
+      return stored as any;
+    }
+    // Fallback for dev cookies
     return {
       id: 1,
       openId,
@@ -247,6 +281,16 @@ export async function createRequester(name: string) {
   const db = await getDb();
   if (!db) throw new Error("DB not available");
   await db.insert(requesters).values({ name, active: true });
+}
+
+export async function updateRequester(id: number, name: string) {
+  if (isUsingMockDb()) {
+    mockDb.updateRequester(id, { name });
+    return;
+  }
+  const db = await getDb();
+  if (!db) throw new Error("DB not available");
+  await db.update(requesters).set({ name }).where(eq(requesters.id, id));
 }
 
 export async function deleteRequester(id: number) {
