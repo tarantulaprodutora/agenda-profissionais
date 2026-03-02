@@ -9,15 +9,16 @@ export function registerMockAuthRoutes(app: Express) {
   // Mock login endpoint - creates a session without OAuth
   app.get("/api/mock-login", async (req: Request, res: Response) => {
     try {
-      const mockOpenId = "dev-user-" + Date.now();
-      const mockName = "Dev User";
+      const mockOpenId = "dev-admin-" + Date.now();
+      const mockName = "Administrador";
 
       // Create or update user in database
       await db.upsertUser({
         openId: mockOpenId,
         name: mockName,
-        email: "dev@example.com",
+        email: "admin@tarantula.com",
         loginMethod: "mock",
+        role: "admin",
         lastSignedIn: new Date(),
       });
 
