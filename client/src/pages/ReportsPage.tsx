@@ -152,8 +152,8 @@ export default function ReportsPage() {
   async function exportPDF() {
     if (!reportData) return;
     try {
-      const { jsPDF } = await import("jspdf");
-      const autoTable = (await import("jspdf-autotable")).default;
+      const { default: jsPDF } = await import("jspdf");
+      const { default: autoTable } = await import("jspdf-autotable");
 
       const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
 
@@ -176,15 +176,15 @@ export default function ReportsPage() {
         for (const entry of s.entries) {
           const activity = activities.find(a => a.id === entry.activityTypeId)?.name || "-";
           tableBody.push([
-            format(parseISO(entry.date), "dd/MM/yy"),
-            entry.startTime,
-            entry.endTime,
-            entry.jobNumber,
-            entry.jobName,
+            entry.date ? format(parseISO(entry.date), "dd/MM/yy") : "-",
+            entry.startTime || "-",
+            entry.endTime || "-",
+            entry.jobNumber || "-",
+            entry.jobName || "-",
             activity,
-            formatHours(entry.durationTotalMin),
-            formatHours(entry.durationNormalMin),
-            formatHours(entry.durationOvertimeMin),
+            formatHours(entry.durationTotalMin || 0),
+            formatHours(entry.durationNormalMin || 0),
+            formatHours(entry.durationOvertimeMin || 0),
           ]);
         }
 
