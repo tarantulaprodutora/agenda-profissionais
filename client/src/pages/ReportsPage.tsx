@@ -11,10 +11,10 @@ import {
 import { trpc } from "@/lib/trpc";
 import { useState, useMemo } from "react";
 import { Link } from "wouter";
-import { CalendarDays, Users, BarChart3, LogOut, Download, FileSpreadsheet, FileText, Filter, Settings } from "lucide-react";
+import { CalendarDays, Users, BarChart3, LogOut, Download, FileSpreadsheet, FileText, Filter, Settings, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { getLoginUrl } from "@/const";
-import { format, subDays } from "date-fns";
+import { format, subDays, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
@@ -44,6 +44,7 @@ export default function ReportsPage() {
   const [endDate, setEndDate] = useState<Date | undefined>(now);
   const [selectedProfId, setSelectedProfId] = useState<string>("all");
   const [selectedActivityId, setSelectedActivityId] = useState<string>("all");
+  const [expandedProf, setExpandedProf] = useState<number | null>(null);
 
   const { data: professionals = [] } = trpc.professionals.list.useQuery();
   const { data: activities = [] } = trpc.activityTypes.list.useQuery();
@@ -67,13 +68,19 @@ export default function ReportsPage() {
     try {
       const ExcelJS = (await import("exceljs")).default;
       const wb = new ExcelJS.Workbook();
-      const ws = wb.addWorksheet(`Relatório ${MONTHS[month - 1]} ${year}`);
+      const ws = wb.addWorksheet(`Relatório Detalhado ${MONTHS[month - 1]} ${year}`);
 
       ws.columns = [
-        { header: "Profissional", key: "prof", width: 25 },
-        { header: "Total (h)", key: "total", width: 12 },
-        { header: "Normal (h)", key: "normal", width: 12 },
-        { header: "Extra (h)", key: "extra", width: 12 },
+        { header: "Data", key: "date", width: 12 },
+        { header: "Profissional", key: "prof", width: 20 },
+        { header: "Início", key: "start", width: 10 },
+        { header: "Fim", key: "end", width: 10 },
+        { header: "Job #", key: "jobNum", width: 15 },
+        { header: "Job Name", key: "jobName", width: 30 },
+        { header: "Atividade", key: "activity", width: 15 },
+        { header: "Total (h)", key: "total", width: 10 },
+        { header: "Normal (h)", key: "normal", width: 10 },
+        { header: "Extra (h)", key: "extra", width: 10 },
       ];
 
       const headerRow = ws.getRow(1);
@@ -82,33 +89,62 @@ export default function ReportsPage() {
       headerRow.alignment = { horizontal: "center" };
 
       for (const s of reportData.summary) {
-        ws.addRow({
-          prof: s.professionalName,
+        // Add a header row for the professional
+        const profRow = ws.addRow({ prof: s.professionalName.toUpperCase() });
+        profRow.font = { bold: true };
+        profRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+
+        for (const entry of s.entries) {
+          const activity = activities.find(a => a.id === entry.activityTypeId)?.name || "-";
+          ws.addRow({
+            date: format(parseISO(entry.date), "dd/MM/yyyy"),
+            prof: s.professionalName,
+            start: entry.startTime,
+            end: entry.endTime,
+            jobNum: entry.jobNumber,
+            jobName: entry.jobName,
+            activity: activity,
+            total: formatHours(entry.durationTotalMin),
+            normal: formatHours(entry.durationNormalMin),
+            extra: formatHours(entry.durationOvertimeMin),
+          });
+        }
+
+        // Add subtotal for professional
+        const subtotalRow = ws.addRow({
+          jobName: `SUBTOTAL ${s.professionalName}`,
           total: formatHours(s.totalMin),
           normal: formatHours(s.normalMin),
           extra: formatHours(s.overtimeMin),
         });
+        subtotalRow.font = { bold: true, italic: true };
+        ws.addRow({}); // Empty spacer row
       }
 
       const totalRow = ws.addRow({
-        prof: "TOTAL",
+        jobName: "TOTAL GERAL",
         total: formatHours(reportData.summary.reduce((a, s) => a + s.totalMin, 0)),
         normal: formatHours(reportData.summary.reduce((a, s) => a + s.normalMin, 0)),
         extra: formatHours(reportData.summary.reduce((a, s) => a + s.overtimeMin, 0)),
       });
       totalRow.font = { bold: true };
       totalRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1E1E2E" } };
+      totalRow.getCell('total').font = { color: { argb: "FFFFFFFF" }, bold: true };
+      totalRow.getCell('normal').font = { color: { argb: "FFFFFFFF" }, bold: true };
+      totalRow.getCell('extra').font = { color: { argb: "FFFFFFFF" }, bold: true };
+      totalRow.getCell('jobName').font = { color: { argb: "FFFFFFFF" }, bold: true };
 
       const buffer = await wb.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `relatorio-${year}-${String(month).padStart(2, "0")}.xlsx`;
+      a.download = `relatorio-detalhado-${year}-${String(month).padStart(2, "0")}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Excel exportado com sucesso");
     } catch (e) {
+      console.error(e);
       toast.error("Erro ao exportar Excel");
     }
   }
@@ -119,41 +155,70 @@ export default function ReportsPage() {
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
 
-      const doc = new jsPDF();
+      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape
 
       doc.setFontSize(18);
       doc.setTextColor(99, 102, 241);
-      doc.text("Agenda Visual de Profissionais", 14, 20);
+      doc.text("Agenda Visual de Profissionais - Relatório Detalhado", 14, 20);
 
       doc.setFontSize(12);
       doc.setTextColor(100, 100, 100);
-      doc.text(`Relatório Mensal — ${MONTHS[month - 1]} ${year}`, 14, 30);
+      doc.text(`Período: ${MONTHS[month - 1]} ${year}`, 14, 30);
       doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 38);
+
+      const tableBody: any[] = [];
+      for (const s of reportData.summary) {
+        // Professional Header
+        tableBody.push([
+          { content: s.professionalName, colSpan: 10, styles: { fillColor: [241, 245, 249], fontStyle: 'bold' } }
+        ]);
+
+        for (const entry of s.entries) {
+          const activity = activities.find(a => a.id === entry.activityTypeId)?.name || "-";
+          tableBody.push([
+            format(parseISO(entry.date), "dd/MM/yy"),
+            entry.startTime,
+            entry.endTime,
+            entry.jobNumber,
+            entry.jobName,
+            activity,
+            formatHours(entry.durationTotalMin),
+            formatHours(entry.durationNormalMin),
+            formatHours(entry.durationOvertimeMin),
+          ]);
+        }
+
+        // Subtotal
+        tableBody.push([
+          { content: `Subtotal ${s.professionalName}`, colSpan: 6, styles: { fontStyle: 'italic', halign: 'right' } },
+          { content: formatHours(s.totalMin), styles: { fontStyle: 'bold' } },
+          { content: formatHours(s.normalMin), styles: { fontStyle: 'bold' } },
+          { content: formatHours(s.overtimeMin), styles: { fontStyle: 'bold' } },
+        ]);
+      }
 
       autoTable(doc, {
         startY: 48,
-        head: [["Profissional", "Total", "Normal", "Extra"]],
-        body: reportData.summary.map((s) => [
-          s.professionalName,
-          formatHours(s.totalMin),
-          formatHours(s.normalMin),
-          formatHours(s.overtimeMin),
-        ]),
+        head: [["Data", "Início", "Fim", "Job #", "Job Name", "Atividade", "Total", "Normal", "Extra"]],
+        body: tableBody,
         foot: [[
-          "TOTAL",
+          { content: "TOTAL GERAL", colSpan: 6, styles: { halign: 'right' } },
           formatHours(reportData.summary.reduce((a, s) => a + s.totalMin, 0)),
           formatHours(reportData.summary.reduce((a, s) => a + s.normalMin, 0)),
           formatHours(reportData.summary.reduce((a, s) => a + s.overtimeMin, 0)),
         ]],
         headStyles: { fillColor: [99, 102, 241], textColor: 255, fontStyle: "bold" },
         footStyles: { fillColor: [30, 30, 46], textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [245, 245, 255] },
-        styles: { fontSize: 10 },
+        styles: { fontSize: 8 },
+        columnStyles: {
+          4: { cellWidth: 60 }, // Job Name width
+        }
       });
 
-      doc.save(`relatorio-${year}-${String(month).padStart(2, "0")}.pdf`);
+      doc.save(`relatorio-detalhado-${year}-${String(month).padStart(2, "0")}.pdf`);
       toast.success("PDF exportado com sucesso");
     } catch (e) {
+      console.error(e);
       toast.error("Erro ao exportar PDF");
     }
   }
@@ -205,99 +270,46 @@ export default function ReportsPage() {
         <div className="max-w-5xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-xl font-bold">Relatórios</h1>
-              <p className="text-sm text-muted-foreground mt-0.5">Horas normais e extras por profissional</p>
+              <h1 className="text-xl font-bold">Relatórios Detalhados</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">Horas e detalhes dos jobs por profissional</p>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={exportExcel} disabled={!reportData || isLoading}>
-                <FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-400" /> Excel
+                <FileSpreadsheet className="w-4 h-4 mr-1.5 text-green-400" /> Excel Detalhado
               </Button>
               <Button variant="outline" size="sm" onClick={exportPDF} disabled={!reportData || isLoading}>
-                <FileText className="w-4 h-4 mr-1.5 text-red-400" /> PDF
+                <FileText className="w-4 h-4 mr-1.5 text-red-400" /> PDF Detalhado
               </Button>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-4 mb-6 p-4 rounded-lg border border-border bg-card">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Tipo:</span>
-              <Select value={reportType} onValueChange={setReportType}>
+              <span className="text-sm text-muted-foreground">Mês:</span>
+              <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
                 <SelectTrigger className="w-36 bg-input border-border h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover border-border">
-                  <SelectItem value="daily">Diário</SelectItem>
-                  <SelectItem value="weekly">Semanal</SelectItem>
-                  <SelectItem value="monthly">Mensal</SelectItem>
-                  <SelectItem value="custom">Período</SelectItem>
+                  {MONTHS.map((m, i) => (
+                    <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {reportType === "monthly" && (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Mês:</span>
-                  <Select value={String(month)} onValueChange={(v) => setMonth(Number(v))}>
-                    <SelectTrigger className="w-36 bg-input border-border h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
-                      {MONTHS.map((m, i) => (
-                        <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Ano:</span>
-                  <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
-                    <SelectTrigger className="w-24 bg-input border-border h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-popover border-border">
-                      {years.map((y) => (
-                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
-
-            {reportType === "custom" && (
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Período:</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-[280px] justify-start text-left font-normal h-8 text-sm bg-input border-border"
-                    >
-                      <CalendarDays className="mr-2 h-4 w-4" />
-                      {startDate && endDate ? (
-                        <>
-                          {format(startDate, "dd/MM/yy")} - {format(endDate, "dd/MM/yy")}
-                        </>
-                      ) : (
-                        <span>Selecione o período</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="range"
-                      selected={{ from: startDate, to: endDate }}
-                      onSelect={(range) => {
-                        setStartDate(range?.from);
-                        setEndDate(range?.to);
-                      }}
-                      numberOfMonths={2}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Ano:</span>
+              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+                <SelectTrigger className="w-24 bg-input border-border h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-popover border-border">
+                  {years.map((y) => (
+                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Profissional:</span>
@@ -313,21 +325,6 @@ export default function ReportsPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Atividade:</span>
-              <Select value={selectedActivityId} onValueChange={setSelectedActivityId}>
-                <SelectTrigger className="w-44 bg-input border-border h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="bg-popover border-border">
-                  <SelectItem value="all">Todas</SelectItem>
-                  {activities.map((a) => (
-                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
           {isLoading ? (
@@ -338,8 +335,8 @@ export default function ReportsPage() {
               <p>Nenhum dado encontrado para o período selecionado.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="space-y-6">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg border border-border bg-card">
                   <p className="text-xs text-muted-foreground mb-1">Total Geral</p>
                   <p className="text-2xl font-bold">{formatHours(reportData.summary.reduce((a, s) => a + s.totalMin, 0))}</p>
@@ -354,27 +351,58 @@ export default function ReportsPage() {
                 </div>
               </div>
 
-              <div className="border border-border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-card border-b border-border">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-semibold">Profissional</th>
-                      <th className="px-4 py-3 text-right font-semibold">Total</th>
-                      <th className="px-4 py-3 text-right font-semibold">Normal</th>
-                      <th className="px-4 py-3 text-right font-semibold">Extra</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportData.summary.map((row, i) => (
-                      <tr key={i} className="border-b border-border hover:bg-card/50">
-                        <td className="px-4 py-3">{row.professionalName}</td>
-                        <td className="px-4 py-3 text-right font-medium">{formatHours(row.totalMin)}</td>
-                        <td className="px-4 py-3 text-right text-blue-400">{formatHours(row.normalMin)}</td>
-                        <td className="px-4 py-3 text-right text-orange-400">{formatHours(row.overtimeMin)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-4">
+                {reportData.summary.map((s) => (
+                  <div key={s.professionalId} className="border border-border rounded-lg overflow-hidden bg-card">
+                    <button 
+                      onClick={() => setExpandedProf(expandedProf === s.professionalId ? null : s.professionalId)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <span className="font-bold text-lg">{s.professionalName}</span>
+                        <div className="flex gap-3 text-sm">
+                          <span className="text-muted-foreground">Total: <b className="text-foreground">{formatHours(s.totalMin)}</b></span>
+                          <span className="text-muted-foreground">Normal: <b className="text-blue-400">{formatHours(s.normalMin)}</b></span>
+                          <span className="text-muted-foreground">Extra: <b className="text-orange-400">{formatHours(s.overtimeMin)}</b></span>
+                        </div>
+                      </div>
+                      {expandedProf === s.professionalId ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    </button>
+
+                    {expandedProf === s.professionalId && (
+                      <div className="border-t border-border overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead className="bg-muted/50 text-muted-foreground">
+                            <tr>
+                              <th className="px-4 py-2 text-left">Data</th>
+                              <th className="px-4 py-2 text-left">Horário</th>
+                              <th className="px-4 py-2 text-left">Job #</th>
+                              <th className="px-4 py-2 text-left">Job Name</th>
+                              <th className="px-4 py-2 text-left">Atividade</th>
+                              <th className="px-4 py-2 text-right">Total</th>
+                              <th className="px-4 py-2 text-right">Normal</th>
+                              <th className="px-4 py-2 text-right">Extra</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {s.entries.map((entry, idx) => (
+                              <tr key={idx} className="hover:bg-accent/30">
+                                <td className="px-4 py-2 whitespace-nowrap">{format(parseISO(entry.date), "dd/MM/yy")}</td>
+                                <td className="px-4 py-2 whitespace-nowrap">{entry.startTime} - {entry.endTime}</td>
+                                <td className="px-4 py-2 font-mono">{entry.jobNumber}</td>
+                                <td className="px-4 py-2 font-medium">{entry.jobName}</td>
+                                <td className="px-4 py-2">{activities.find(a => a.id === entry.activityTypeId)?.name || "-"}</td>
+                                <td className="px-4 py-2 text-right">{formatHours(entry.durationTotalMin)}</td>
+                                <td className="px-4 py-2 text-right text-blue-400">{formatHours(entry.durationNormalMin)}</td>
+                                <td className="px-4 py-2 text-right text-orange-400">{formatHours(entry.durationOvertimeMin)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
