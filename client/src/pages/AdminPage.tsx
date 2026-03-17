@@ -331,13 +331,26 @@ export default function AdminPage() {
             <h1 className="text-4xl font-bold text-white mb-2">Administração</h1>
             <p className="text-slate-400">Gerencie usuários, solicitantes e profissionais</p>
           </div>
-          <Button
-            variant="outline"
-            onClick={() => setLocation("/")}
-            className="text-slate-300 border-slate-600 hover:bg-slate-700"
-          >
-            Voltar à Agenda
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setLocation("/")}
+              className="text-slate-300 border-slate-600 hover:bg-slate-700"
+            >
+              Voltar à Agenda
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                fetch("/api/auth/logout", { method: "POST" }).then(() => {
+                  window.location.href = "/login";
+                });
+              }}
+              className="text-slate-400 hover:text-white"
+            >
+              Sair
+            </Button>
+          </div>
         </div>
 
         <Tabs defaultValue="users" className="w-full">

@@ -19,7 +19,7 @@ export default function ProtectedRoute({ children, requiredRole = "admin" }: Pro
       return;
     }
 
-    if (requiredRole && user?.role !== requiredRole) {
+    if (requiredRole === "admin" && user?.role !== "admin") {
       setLocation("/");
       return;
     }
@@ -37,7 +37,7 @@ export default function ProtectedRoute({ children, requiredRole = "admin" }: Pro
     return null;
   }
 
-  if (requiredRole && user?.role !== requiredRole) {
+  if (requiredRole === "admin" && user?.role !== "admin") {
     return null;
   }
 

@@ -66,7 +66,7 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Create session token - use dev- prefix format so verifySession recognizes it
-      const openId = user.role === "admin" ? `dev-admin-${Date.now()}` : `dev-user-${Date.now()}`;
+      const openId = user.role === "admin" ? `dev-admin-${user.id}` : `dev-user-${user.id}`;
       let sessionToken: string;
       try {
         sessionToken = await sdk.createSessionToken(openId, {
@@ -207,7 +207,8 @@ export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/logout", async (req: Request, res: Response) => {
     try {
       const cookieOptions = getSessionCookieOptions(req);
-      res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      const { maxAge, ...clearOptions } = cookieOptions as any;
+      res.clearCookie(COOKIE_NAME, clearOptions);
       res.json({ success: true });
     } catch (error) {
       console.error("[Auth] Logout failed", error);

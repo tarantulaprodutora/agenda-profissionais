@@ -255,11 +255,13 @@ export default function ReportsPage() {
         </nav>
         <div className="flex items-center gap-2">
           {isAuthenticated ? (
-            <>
+            <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground hidden sm:block">{user?.name}</span>
-              <Badge variant="outline" className="text-xs border-primary/40 text-primary">Admin</Badge>
-              <Button variant="ghost" size="sm" onClick={logout}><LogOut className="w-4 h-4" /></Button>
-            </>
+              {isAdmin && <Badge variant="outline" className="text-xs border-primary/40 text-primary">Admin</Badge>}
+              <Button variant="ghost" size="sm" onClick={logout} className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground">
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           ) : (
             <Button size="sm" onClick={() => window.location.href = getLoginUrl()}>Entrar</Button>
           )}
