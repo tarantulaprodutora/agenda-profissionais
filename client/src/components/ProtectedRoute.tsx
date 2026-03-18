@@ -12,6 +12,10 @@ export default function ProtectedRoute({ children, requiredRole = "admin" }: Pro
   const [, setLocation] = useLocation();
 
   useEffect(() => {
+    // Limpeza global de possíveis bloqueios de UI ao trocar de rota
+    document.body.style.overflow = "auto";
+    document.body.style.pointerEvents = "auto";
+    
     if (loading) return;
 
     if (!isAuthenticated) {

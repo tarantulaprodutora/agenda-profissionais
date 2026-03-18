@@ -28,6 +28,9 @@ export default function LoginPage() {
       }
 
       toast.success("Login realizado com sucesso!");
+      // Garantir que o scroll do body seja restaurado caso algum modal tenha travado
+      document.body.style.overflow = "auto";
+      document.body.style.pointerEvents = "auto";
       setTimeout(() => setLocation("/"), 500);
     } catch (error) {
       toast.error("Erro ao conectar ao servidor");
